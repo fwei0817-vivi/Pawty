@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宠物照片分享 - PetShare</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px 0;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo::before {
+            content: "🐾";
+            font-size: 32px;
+        }
+
+        .upload-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .main-content {
+            padding: 40px 0;
+        }
+
+        .upload-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .upload-section.active {
+            display: block;
+        }
+
+        .upload-form {
+            display: grid;
+            gap: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #f8f9fa;
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .file-input-label:hover {
+            background: #e3f2fd;
+            border-color: #2196f3;
+        }
+
+        .preview-image {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 10px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .submit-btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+        }
+
+        .feed {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 30px;
+        }
+
+        .post-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .post-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+
+        .post-image {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            border-bottom: 1px solid #eee;
+        }
+
+        .post-content {
+            padding: 20px;
+        }
+
+        .pet-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .pet-description {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .post-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            color: #999;
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            transition: color 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .action-btn:hover {
+            color: #667eea;
+        }
+
+        .action-btn.liked {
+            color: #e91e63;
+        }
+
+        .cancel-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .feed {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">PetShare</div>
+                <button class="upload-btn" onclick="toggleUpload()">
+                    <span>📷</span>
+                    <span>分享宠物照片</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-form">
+                    <div class="form-group">
+                        <label for="petName">宠物名字</label>
+                        <input type="text" id="petName" placeholder="给你的宠物起个可爱的名字">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="petImage">宠物照片</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="petImage" class="file-input" accept="image/*" onchange="previewImage(event)">
+                            <label for="petImage" class="file-input-label">
+                                选择照片 📸
+                            </label>
+                        </div>
+                        <img id="previewImage" class="preview-image" alt="预览图片">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="petDescription">宠物介绍</label>
+                        <textarea id="petDescription" rows="3" placeholder="介绍一下你的宠物，比如品种、性格、有趣的故事..."></textarea>
+                    </div>
+                    
+                    <div>
+                        <button class="submit-btn" onclick="submitPost()">发布分享</button>
+                        <button class="cancel-btn" onclick="toggleUpload()">取消</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feed" id="feed">
+                <!-- 示例帖子 -->
+                <div class="post-card">
+                    <img src="https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=400&h=250&fit=crop" alt="可爱的金毛" class="post-image">
+                    <div class="post-content">
+                        <div class="pet-name">小金 🐕</div>
+                        <div class="pet-description">我家的金毛小金，今年3岁了，特别喜欢游泳和玩飞盘！每次去公园都兴奋得不得了。</div>
+                        <div class="post-meta">
+                            <span>2小时前</span>
+                            <span>👤 小明</span>
+                        </div>
+                        <div class="post-actions">
+                            <button class="action-btn" onclick="toggleLike(this)">
+                                <span>❤️</span>
+                                <span class="like-count">12</span>
+                            </button>
+                            <button class="action-btn">
+                                <span>💬</span>
+                                <span>评论</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="post-card">
+                    <img src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=400&h=250&fit=crop" alt="可爱的橘猫" class="post-image">
+                    <div class="post-content">
+                        <div class="pet-name">橘子 🐱</div>
+                        <div class="pet-description">橘子是一只橘猫，性格超级温顺，最喜欢的事情就是晒太阳和吃小鱼干！</div>
+                        <div class="post-meta">
+                            <span>5小时前</span>
+                            <span>👤 小红</span>
+                        </div>
+                        <div class="post-actions">
+                            <button class="action-btn" onclick="toggleLike(this)">
+                                <span>❤️</span>
+                                <span class="like-count">25</span>
+                            </button>
+                            <button class="action-btn">
+                                <span>💬</span>
+                                <span>评论</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="post-card">
+                    <img src="https://images.unsplash.com/photo-1450778869180-41d0601e046e?w=400&h=250&fit=crop" alt="可爱的兔子" class="post-image">
+                    <div class="post-content">
+                        <div class="pet-name">雪球 🐰</div>
+                        <div class="pet-description">雪球是一只荷兰兔，白色的毛发像雪一样，最喜欢吃胡萝卜和青菜！</div>
+                        <div class="post-meta">
+                            <span>1天前</span>
+                            <span>👤 小李</span>
+                        </div>
+                        <div class="post-actions">
+                            <button class="action-btn" onclick="toggleLike(this)">
+                                <span>❤️</span>
+                                <span class="like-count">8</span>
+                            </button>
+                            <button class="action-btn">
+                                <span>💬</span>
+                                <span>评论</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 切换上传区域显示
+        function toggleUpload() {
+            const uploadSection = document.getElementById('uploadSection');
+            uploadSection.classList.toggle('active');
+        }
+
+        // 预览图片
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('previewImage');
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // 提交帖子
+        function submitPost() {
+            const petName = document.getElementById('petName').value;
+            const petImage = document.getElementById('petImage').files[0];
+            const petDescription = document.getElementById('petDescription').value;
+            const previewImage = document.getElementById('previewImage').src;
+
+            if (!petName || !petImage || !petDescription) {
+                alert('请填写完整信息！');
+                return;
+            }
+
+            // 创建新的帖子
+            const postCard = document.createElement('div');
+            postCard.className = 'post-card';
+            postCard.innerHTML = `
+                <img src="${previewImage}" alt="${petName}" class="post-image">
+                <div class="post-content">
+                    <div class="pet-name">${petName}</div>
+                    <div class="pet-description">${petDescription}</div>
+                    <div class="post-meta">
+                        <span>刚刚</span>
+                        <span>👤 我</span>
+                    </div>
+                    <div class="post-actions">
+                        <button class="action-btn" onclick="toggleLike(this)">
+                            <span>❤️</span>
+                            <span class="like-count">0</span>
+                        </button>
+                        <button class="action-btn">
+                            <span>💬</span>
+                            <span>评论</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // 添加到信息流顶部
+            const feed = document.getElementById('feed');
+            feed.insertBefore(postCard, feed.firstChild);
+
+            // 清空表单
+            document.getElementById('petName').value = '';
+            document.getElementById('petImage').value = '';
+            document.getElementById('petDescription').value = '';
+            document.getElementById('previewImage').style.display = 'none';
+
+            // 隐藏上传区域
+            toggleUpload();
+
+            // 显示成功消息
+            alert('发布成功！你的宠物照片已经分享到社区啦！🎉');
+        }
+
+        // 切换点赞状态
+        function toggleLike(button) {
+            button.classList.toggle('liked');
+            const likeCount = button.querySelector('.like-count');
+            const currentCount = parseInt(likeCount.textContent);
+            
+            if (button.classList.contains('liked')) {
+                likeCount.textContent = currentCount + 1;
+            } else {
+                likeCount.textContent = currentCount - 1;
+            }
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('PetShare 宠物照片分享社区已加载完成！');
+        });
+    </script>
+</body>
+</html>

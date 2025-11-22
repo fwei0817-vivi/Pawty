@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pawty - 萌宠元宇宙</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Quicksand', 'sans-serif'] },
+                    colors: {
+                        'cream': '#FFF9F0',
+                        'soft-pink': '#FF9EAA',
+                        'soft-blue': '#A2D2FF',
+                        'soft-yellow': '#FFE5B4',
+                        'soft-purple': '#CDB4DB',
+                        'chocolate': '#4A3B32', // Logo 专用色
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Quicksand', sans-serif; background-color: #FFF9F0; overflow-x: hidden; }
+        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        .animate-pop-in { animation: pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+        @keyframes pop-in { 0% { opacity: 0; transform: scale(0.9) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes slide-down-fade { 0% { opacity: 0; transform: translate(-50%, -20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        .animate-slide-down { animation: slide-down-fade 0.3s ease-out forwards; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .cute-card { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 2px solid #FFF; box-shadow: 8px 8px 0px rgba(200, 200, 200, 0.15); border-radius: 24px; }
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
+        .carousel-container { scroll-snap-type: x mandatory; }
+        .carousel-item { scroll-snap-align: center; }
+        .hobby-tag.selected { background-color: #A2D2FF; color: white; border-color: #A2D2FF; }
+
+        /* --- Logo 互动动画 --- */
+        .logo-container .logo-cat, 
+        .logo-container .logo-dog {
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform-origin: bottom center;
+        }
+        /* 悬停时：猫咪探头 */
+        .logo-container:hover .logo-cat {
+            transform: translateY(-5px) rotate(10deg) scale(1.1);
+        }
+        /* 悬停时：狗狗歪头 */
+        .logo-container:hover .logo-dog {
+            transform: rotate(-5deg) scale(1.05);
+        }
+    </style>
+</head>
+<body class="text-gray-700 pb-24 md:pb-0 min-h-screen relative">
+
+    <!-- 背景装饰 -->
+    <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div class="absolute top-10 left-10 w-64 h-64 bg-soft-pink rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float"></div>
+        <div class="absolute top-10 right-10 w-72 h-72 bg-soft-blue rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float"></div>
+    </div>
+
+    <!-- 删除确认弹窗 -->
+    <div id="delete-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+        <div class="bg-white rounded-3xl p-6 w-80 shadow-2xl border-4 border-white">
+            <div class="text-center mb-4">
+                <div class="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i data-lucide="trash-2" size="32"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">真的要删除吗？</h3>
+                <p class="text-gray-400 text-sm mt-1">删掉就没有了哦 🥺</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="cancelDelete()" class="flex-1 px-4 py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-colors">算啦</button>
+                <button onclick="confirmDelete()" class="flex-1 px-4 py-3 rounded-2xl bg-red-500 text-white font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-200">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 顶部提示条 -->
+    <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 z-[80] hidden">
+        <div class="bg-gray-800/90 backdrop-blur text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 animate-slide-down border border-gray-700">
+            <i data-lucide="info" size="20" class="text-yellow-400"></i>
+            <span id="toast-message" class="font-bold text-sm tracking-wide"></span>
+        </div>
+    </div>
+
+    <!-- 导航栏 (更新：巧克力色Logo + 大写PAWTY + 加大号导航字体) -->
+    <nav class="absolute top-4 left-4 right-4 z-50 px-6 py-3 backdrop-blur-lg bg-white/20 rounded-3xl border border-white/30 shadow-sm">
+        <div class="max-w-5xl mx-auto flex justify-between items-center">
+            
+            <!-- 桌面端 Logo (带动画) -->
+            <div class="hidden md:flex items-center gap-3 cursor-pointer logo-container" onclick="switchTab('community')">
+                <div class="relative h-11 w-16">
+                    <!-- 狗狗图标 -->
+                    <i data-lucide="dog" class="absolute bottom-0 left-0 text-chocolate w-10 h-10 fill-chocolate logo-dog" style="stroke-width: 2.5px;"></i>
+                    <!-- 猫咪图标 (位于狗上方) -->
+                    <i data-lucide="cat" class="absolute -top-2 right-1 text-chocolate w-8 h-8 fill-cream logo-cat" style="stroke-width: 2.5px;"></i>
+                </div>
+                <span class="text-chocolate font-bold text-3xl tracking-widest" style="font-family: 'Quicksand', sans-serif;">PAWTY</span>
+            </div>
+
+            <!-- 移动端 Logo -->
+            <div class="md:hidden flex items-center gap-2 cursor-pointer" onclick="switchTab('community')">
+                <div class="relative h-8 w-10">
+                     <i data-lucide="dog" class="absolute bottom-0 left-0 text-chocolate w-7 h-7 fill-chocolate"></i>
+                     <i data-lucide="cat" class="absolute -top-1 right-0 text-chocolate w-5 h-5 fill-cream"></i>
+                </div>
+                <span class="text-chocolate font-bold text-xl tracking-wider">PAWTY</span>
+            </div>
+
+            <div class="flex justify-around w-full md:w-auto md:gap-8" id="nav-container">
+                <button onclick="switchTab('community')" class="nav-btn group flex flex-col items-center p-2" data-target="community">
+                    <i data-lucide="cookie" size="28" class="text-gray-400 group-hover:text-soft-pink transition-colors"></i>
+                    <span class="text-lg font-bold text-gray-400 group-hover:text-soft-pink mt-1">社区</span>
+                </button>
+                <button onclick="switchTab('mypet')" class="nav-btn group flex flex-col items-center p-2" data-target="mypet">
+                    <i data-lucide="cat" size="28" class="text-gray-400 group-hover:text-soft-blue transition-colors"></i>
+                    <span class="text-lg font-bold text-gray-400 group-hover:text-soft-blue mt-1">我的崽</span>
+                </button>
+                <button onclick="switchTab('ai-portrait')" class="nav-btn group flex flex-col items-center p-2" data-target="ai-portrait">
+                    <i data-lucide="camera" size="28" class="text-gray-400 group-hover:text-soft-purple transition-colors"></i>
+                    <span class="text-lg font-bold text-gray-400 group-hover:text-soft-purple mt-1">变身</span>
+                </button>
+                <button onclick="switchTab('ai-advisor')" class="nav-btn group flex flex-col items-center p-2" data-target="ai-advisor">
+                    <i data-lucide="message-circle-heart" size="28" class="text-gray-400 group-hover:text-orange-400 transition-colors"></i>
+                    <span class="text-lg font-bold text-gray-400 group-hover:text-orange-400 mt-1">聊聊</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 宠物编辑弹窗 -->
+    <div id="pet-editor-modal" class="fixed inset-0 z-[60] hidden modal-overlay flex items-center justify-center p-4 animate-pop-in">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border-4 border-white h-[90vh] overflow-y-auto scrollbar-hide">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800" id="modal-title">编辑档案</h3>
+                <button onclick="closePetModal()" class="p-2 hover:bg-gray-100 rounded-full"><i data-lucide="x"></i></button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="flex flex-col items-center mb-4">
+                    <div class="relative w-24 h-24 rounded-full bg-gray-100 border-4 border-soft-blue overflow-hidden cursor-pointer hover:opacity-80 transition-opacity" onclick="document.getElementById('pet-avatar-input').click()">
+                        <img id="preview-avatar" src="" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 flex items-center justify-center bg-black/30 text-white opacity-0 hover:opacity-100 transition-opacity"><i data-lucide="camera" size="24"></i></div>
+                    </div>
+                    <span class="text-xs text-gray-400 mt-2">点击更换头像</span>
+                    <input type="file" id="pet-avatar-input" class="hidden" accept="image/*" onchange="previewPetAvatar(event)">
+                </div>
+                
+                <div><label class="text-xs font-bold text-gray-500 ml-1">姓名</label><input type="text" id="input-name" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 font-bold" placeholder="如: 布丁"></div>
+                
+                <div>
+                    <label class="text-xs font-bold text-gray-500 ml-1">年龄</label>
+                    <div class="flex gap-2">
+                        <select id="input-age-year" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 font-bold"></select>
+                        <select id="input-age-month" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 font-bold"></select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="text-xs font-bold text-gray-500 ml-1">种类</label><select id="input-species" onchange="updateBreedOptions()" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 font-bold"><option value="猫">🐱 猫猫</option><option value="狗">🐶 狗狗</option><option value="其他">🐰 其他</option></select></div>
+                    <div><label class="text-xs font-bold text-gray-500 ml-1">品种</label><select id="input-breed" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 font-bold"></select></div>
+                </div>
+                
+                <div><label class="text-xs font-bold text-gray-500 ml-1">体重 (kg)</label><input type="text" id="input-weight" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 font-bold" placeholder="如: 4.5"></div>
+                
+                <div>
+                    <label class="text-xs font-bold text-gray-500 ml-1">爱好 (点击选择或手动输入)</label>
+                    <div class="flex flex-wrap gap-2 mt-2 mb-2" id="hobby-tags-container"></div>
+                    <input type="text" id="input-hobby-custom" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 font-bold text-sm" placeholder="输入其他爱好 (保存时会自动添加)" onkeypress="if(event.key === 'Enter') addCustomHobby()">
+                </div>
+
+                <button onclick="savePet()" class="w-full py-3 bg-gray-800 text-white rounded-xl font-bold text-lg hover:bg-black shadow-lg mt-4">保存档案</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 健康记录弹窗 -->
+    <div id="health-editor-modal" class="fixed inset-0 z-[60] hidden modal-overlay flex items-center justify-center p-4 animate-pop-in">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border-4 border-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-800">添加健康记录 🏥</h3>
+                <button onclick="closeHealthModal()" class="p-2 hover:bg-gray-100 rounded-full"><i data-lucide="x"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div><label class="text-xs font-bold text-gray-500 ml-1">日期</label><input type="date" id="health-date" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 font-bold"></div>
+                <div><label class="text-xs font-bold text-gray-500 ml-1">症状</label><select id="health-symptom" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 font-bold"><option value="routine">💉 常规疫苗/驱虫</option><option value="checkup">🩺 定期体检</option><option value="vomit">🤮 呕吐/软便</option><option value="skin">🦠 皮肤/耳螨</option><option value="other">❓ 其他</option></select></div>
+                <div><label class="text-xs font-bold text-gray-500 ml-1">描述 (可选)</label><textarea id="health-desc" rows="3" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 font-bold" placeholder="详细情况... (选填)"></textarea></div>
+                <button onclick="saveHealthRecord()" class="w-full py-3 bg-green-500 text-white rounded-xl font-bold text-lg hover:bg-green-600 shadow-lg">添加记录</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-5xl mx-auto p-4 md:p-8 pt-4 md:pt-32">
+        
+        <!-- 1. 社区模块 -->
+        <div id="community" class="tab-content animate-pop-in space-y-6">
+            <div class="flex justify-end items-center"> 
+                <button onclick="togglePostBox()" class="bg-soft-pink hover:bg-pink-400 text-white px-5 py-3 rounded-2xl shadow-lg shadow-pink-200 transition-all hover:scale-105 hover:-rotate-2 flex items-center gap-2 font-bold">
+                    <i data-lucide="sparkles" size="18"></i>
+                    <span>发动态</span>
+                </button>
+            </div>
+
+            <div id="post-box" class="hidden cute-card p-4 animate-pop-in border-soft-pink">
+                <textarea id="post-content" class="w-full p-4 bg-cream border-2 border-pink-100 rounded-2xl focus:border-soft-pink focus:outline-none resize-none text-gray-600 placeholder-pink-200" rows="3" placeholder="今天发生了什么好玩的事？✨"></textarea>
+                <div id="image-preview-area" class="hidden mt-3 grid grid-cols-3 gap-2"></div>
+                <div class="flex justify-between items-center mt-3">
+                    <input type="file" id="image-upload-input" accept="image/*" multiple class="hidden" onchange="handleImageUpload(event)">
+                    <button onclick="document.getElementById('image-upload-input').click()" class="p-2 text-pink-300 hover:bg-pink-50 rounded-full transition-colors hover:scale-110 active:scale-95 flex items-center gap-1" title="添加图片">
+                        <i data-lucide="image-plus" size="24"></i>
+                        <span class="text-xs font-bold ml-1" id="image-count-tip"></span>
+                    </button>
+                    <button onclick="publishPost()" class="bg-gray-800 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-gray-900 hover:shadow-lg transition-all active:scale-95">biu~ 发送</button>
+                </div>
+            </div>
+
+            <div id="posts-container" class="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+                <div class="cute-card overflow-hidden break-inside-avoid hover:-translate-y-2 transition-transform duration-300">
+                    <div class="relative group">
+                        <img src="pictures/laula-co-sICtHYZzt_s-unsplash.jpg" class="w-full object-cover">
+                        <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none"><i data-lucide="heart" class="text-white fill-current animate-bounce" size="48"></i></div>
+                    </div>
+                    <div class="p-5">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="p-0.5 bg-gradient-to-tr from-soft-pink to-soft-blue rounded-full"><img src="pictures/" class="w-9 h-9 rounded-full bg-white border-2 border-white"></div>
+                            <span class="font-bold text-gray-700 text-sm">Bella the Queen</span>
+                        </div>
+                        <p class="text-gray-600 text-sm mb-4">今天去公园玩，它看起来超开心！🐶</p>
+                        <div class="flex justify-between items-center">
+                            <button class="flex items-center gap-1.5 text-gray-400 hover:text-pink-500 transition-colors group" onclick="likePost(this)">
+                                <div class="p-1.5 rounded-full bg-pink-50 group-hover:bg-pink-100 transition-colors"><i data-lucide="heart" size="16"></i></div><span class="text-xs font-bold count">124</span>
+                            </button>
+                            <button onclick="deletePost(this)" class="text-gray-300 hover:text-red-400"><i data-lucide="trash-2" size="16"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 我的宠物模块 -->
+        <div id="mypet" class="tab-content hidden animate-pop-in space-y-6">
+            <div class="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-hide" id="pet-switcher">
+                <button onclick="openPetModal(true)" class="flex flex-col items-center gap-1 min-w-[60px] group">
+                    <div class="w-14 h-14 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center bg-white group-hover:border-soft-blue transition-colors"><i data-lucide="plus" class="text-gray-300 group-hover:text-soft-blue"></i></div>
+                    <span class="text-xs font-bold text-gray-400">添加</span>
+                </button>
+            </div>
+
+            <div class="relative cute-card p-8 mt-8 overflow-visible" id="pet-profile-card">
+                <button onclick="openPetModal(false)" class="absolute top-4 right-4 p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-soft-blue hover:text-white transition-colors"><i data-lucide="edit-3" size="18"></i></button>
+                <div class="absolute -top-10 left-1/2 transform -translate-x-1/2">
+                    <div class="w-24 h-24 rounded-full p-1.5 bg-white shadow-xl"><img id="display-avatar" src="" class="w-full h-full rounded-full object-cover border-4 border-soft-blue"></div>
+                </div>
+                <div class="mt-10 text-center space-y-1">
+                    <h3 class="text-2xl font-bold text-gray-800 flex items-center justify-center gap-2"><span id="display-name"></span><span id="display-species-icon" class="text-lg"></span></h3>
+                    <p class="text-gray-400 font-medium text-sm"><span id="display-breed"></span> · <span id="display-age"></span></p>
+                    <div id="display-hobbies" class="flex flex-wrap justify-center gap-2 pt-3"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mt-6">
+                    <div class="bg-soft-pink/10 p-3 rounded-2xl text-center border border-soft-pink/20"><i data-lucide="weight" class="mx-auto w-4 h-4 text-soft-pink mb-1"></i><div class="text-lg font-bold text-gray-700"><span id="display-weight"></span> <span class="text-xs">kg</span></div><div class="text-xs text-gray-400 font-bold">体重</div></div>
+                    <div class="bg-soft-blue/10 p-3 rounded-2xl text-center border border-soft-blue/20"><i data-lucide="cake" class="mx-auto w-4 h-4 text-soft-blue mb-1"></i><div class="text-lg font-bold text-gray-700" id="display-age-box"></div><div class="text-xs text-gray-400 font-bold">年龄</div></div>
+                </div>
+            </div>
+
+            <div class="cute-card p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-2"><div class="bg-green-100 p-2 rounded-lg text-green-600"><i data-lucide="clipboard-list" size="20"></i></div><h3 class="font-bold text-lg text-gray-800">健康小本本</h3></div>
+                    <button onclick="openHealthModal()" class="text-xs font-bold bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600 flex items-center gap-1"><i data-lucide="plus" size="14"></i> 记录</button>
+                </div>
+                <div id="health-timeline" class="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent min-h-[100px]"></div>
+            </div>
+        </div>
+
+        <!-- 3. AI 写真模块 (模拟版) -->
+        <div id="ai-portrait" class="tab-content hidden animate-pop-in h-full flex flex-col space-y-6">
+            <div class="text-center mb-4">
+                <h2 class="text-3xl font-bold text-gray-800 flex items-center justify-center gap-2"><i data-lucide="sparkles" class="text-soft-purple"></i> AI 变身魔法 <i data-lucide="sparkles" class="text-soft-purple"></i></h2>
+                <p class="text-gray-500 text-sm mt-1">上传照片，一键生成超级大片</p>
+            </div>
+            <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="space-y-6">
+                    <div class="border-3 border-dashed border-soft-purple/30 rounded-3xl h-56 flex flex-col items-center justify-center bg-white/50 hover:bg-soft-purple/5 hover:border-soft-purple transition-all cursor-pointer group relative overflow-hidden">
+                        <div class="p-4 bg-white rounded-full shadow-md group-hover:scale-110 transition-transform duration-300 mb-3 z-10"><i data-lucide="upload-cloud" size="32" class="text-soft-purple"></i></div>
+                        <p class="text-sm font-bold text-gray-400 z-10">点我上传主子的美照</p>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-700 mb-4">选择魔法风格</h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div onclick="selectStyle(this, 'cyberpunk')" class="style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-soft-purple shadow-lg transform scale-105"><img src="download.jpeg" class="w-full h-full object-cover"><div class="absolute bottom-0 inset-x-0 bg-black/50 p-1 text-center"><span class="text-white text-[10px] font-bold">赛博朋克</span></div></div>
+                            <div onclick="selectStyle(this, 'watercolor')" class="style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-transparent opacity-70 hover:opacity-100 hover:scale-105"><img src="https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=400" class="w-full h-full object-cover"><div class="absolute bottom-0 inset-x-0 bg-black/50 p-1 text-center"><span class="text-white text-[10px] font-bold">水彩梦境</span></div></div>
+                            <div onclick="selectStyle(this, 'cartoon')" class="style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-transparent opacity-70 hover:opacity-100 hover:scale-105"><img src="https://images.unsplash.com/photo-1601643157091-ce5c665179ab?w=400" class="w-full h-full object-cover"><div class="absolute bottom-0 inset-x-0 bg-black/50 p-1 text-center"><span class="text-white text-[10px] font-bold">迪士尼</span></div></div>
+                            <div onclick="selectStyle(this, 'royal')" class="style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-transparent opacity-70 hover:opacity-100 hover:scale-105"><img src="https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=400" class="w-full h-full object-cover"><div class="absolute bottom-0 inset-x-0 bg-black/50 p-1 text-center"><span class="text-white text-[10px] font-bold">皇家油画</span></div></div>
+                        </div>
+                    </div>
+                    <button id="generate-btn" onclick="generateImage()" class="w-full py-4 rounded-2xl font-bold text-white shadow-xl shadow-soft-purple/30 bg-gradient-to-r from-soft-purple to-indigo-400 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 text-lg"><i data-lucide="wand-2"></i><span>施展魔法 ✨</span></button>
+                </div>
+                <div class="bg-white rounded-3xl p-2 shadow-2xl border-4 border-white relative min-h-[400px] flex items-center justify-center overflow-hidden">
+                    <div id="result-placeholder" class="text-center"><div class="bg-gray-50 w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse"><i data-lucide="image" class="text-gray-300" size="48"></i></div><p class="text-gray-400 font-bold">魔法结果会出现在这里哦</p></div>
+                    <div id="loading-indicator" class="hidden text-center"><i data-lucide="paw-print" class="text-soft-purple mx-auto mb-4 animate-bounce" size="48"></i><p class="text-soft-purple font-bold animate-pulse">AI 正在挥舞魔杖...</p></div>
+                    <div id="generated-result" class="hidden w-full h-full relative rounded-2xl overflow-hidden group animate-pop-in"><img id="result-img" src="" class="w-full h-full object-cover"><div class="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform bg-white/90 backdrop-blur"><button class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl hover:bg-black">保存到相册</button></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. AI 顾问 (API连接版 - 修复) -->
+        <div id="ai-advisor" class="tab-content hidden animate-pop-in">
+            <div class="h-[calc(100vh-180px)] md:h-[600px] flex flex-col bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl border-2 border-white overflow-hidden">
+                <div class="p-4 bg-gradient-to-r from-soft-yellow/50 to-orange-100/50 flex items-center gap-3 border-b border-white">
+                    <div class="relative"><div class="w-12 h-12 bg-white rounded-full p-1 shadow-sm"><img src="https://api.dicebear.com/7.x/bottts/svg?seed=Doctor" class="w-full h-full rounded-full"></div><div class="absolute bottom-0 right-0 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div></div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-gray-800">Dr. AI 喵医生 🎓</h3>
+                        <div class="flex items-center gap-1 mt-1">
+                            <span class="text-xs text-gray-500">正在看诊:</span>
+                            <!-- 下拉菜单：保证不为空，自动选中 -->
+                            <select id="chat-pet-select" onchange="switchChatPet(this.value)" class="text-xs font-bold text-orange-600 bg-white/50 border-none rounded-lg px-2 py-0.5 focus:ring-1 focus:ring-orange-300 outline-none cursor-pointer">
+                                <!-- JS填充 -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
+                    <div class="flex justify-start gap-3"><img src="https://api.dicebear.com/7.x/bottts/svg?seed=Doctor" class="w-8 h-8 rounded-full bg-white shadow-sm mt-2"><div class="max-w-[80%] p-4 rounded-2xl rounded-tl-none bg-white shadow-md text-gray-600 text-sm leading-relaxed border border-gray-100">你好呀！我是你的专属宠物顾问。🐱 <br>有什么不懂的都可以问我，比如“猫咪不喝水怎么办？”</div></div>
+                </div>
+                <div class="p-4 bg-white border-t border-gray-100">
+                    <div class="flex gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-200 focus-within:border-soft-yellow focus-within:bg-white focus-within:ring-4 focus-within:ring-soft-yellow/20 transition-all">
+                        <input type="text" id="chat-input" placeholder="在这输入你的问题..." class="flex-1 bg-transparent border-none focus:ring-0 px-4 text-sm font-bold text-gray-600" onkeypress="handleKeyPress(event)">
+                        <button onclick="sendMessage()" class="bg-soft-yellow text-orange-600 p-2.5 rounded-xl hover:bg-orange-400 hover:text-white transition-colors shadow-sm"><i data-lucide="send" size="20"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        lucide.createIcons();
+
+        // --- 数据配置 ---
+        let pets = [
+            {
+                id: 1,
+                name: "布丁",
+                age: "2岁 3个月",
+                species: "猫",
+                breed: "英短蓝猫",
+                weight: "4.5",
+                hobbies: ["睡觉", "吃冻干"],
+                avatar: "https://images.unsplash.com/photo-1543852786-1cf6624b9987?w=800&auto=format&fit=crop&q=60",
+                records: [
+                    { date: "2023-10-15", type: "routine", desc: "常规疫苗接种 (妙三多)" },
+                    { date: "2023-05-20", type: "skin", desc: "轻微耳螨治疗" }
+                ]
+            }
+        ];
+        
+        const breedOptions = {
+            "猫": ["英短蓝猫", "美短", "布偶猫", "中华田园猫", "波斯猫", "暹罗猫", "无毛猫", "缅因猫", "斯芬克斯", "俄罗斯蓝猫", "加菲猫"],
+            "狗": ["金毛", "柯基", "拉布拉多", "哈士奇", "柴犬", "泰迪", "边牧", "萨摩耶", "比熊", "德牧"],
+            "其他": ["兔子", "仓鼠", "鹦鹉", "乌龟"]
+        };
+
+        const PRESET_HOBBIES = ['睡觉', '干饭', '跑酷', '晒太阳', '抓老鼠', '拆家', '发呆', '撒娇', '玩球', '洗澡'];
+        const FUN_USERNAMES = ["Pawsome", "MeowMix", "Zoomies", "Doggo", "KittyCat", "FluffBall", "BorkBork", "Purrfect", "TailWag", "FurryFriend"];
+        
+        let activePetIndex = 0;
+        let isEditing = false;
+        let currentPostImages = [];
+        const MAX_IMAGES = 6;
+        let deleteTarget = null;
+        let currentStyle = 'cyberpunk';
+        const styleImages = {
+            'cyberpunk': 'https://images.unsplash.com/photo-1615751072497-5f5169febe33?w=800',
+            'watercolor': 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=800',
+            'cartoon': 'https://images.unsplash.com/photo-1601643157091-ce5c665179ab?w=800',
+            'royal': 'https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=800'
+        };
+
+        // --- 通用逻辑 ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                const isActive = btn.dataset.target === tabId;
+                const iconDiv = btn.querySelector('div') || btn; 
+                const textSpan = btn.querySelector('span');
+                const icon = btn.querySelector('i');
+
+                if (!isActive) {
+                    icon.classList.remove('text-soft-pink', 'text-soft-blue', 'text-soft-purple', 'text-orange-400');
+                    icon.classList.add('text-gray-400');
+                    textSpan.className = "text-xs font-bold text-gray-400 group-hover:text-gray-600";
+                }
+            });
+
+            const activeBtn = document.querySelector(`button[data-target="${tabId}"]`);
+            if(activeBtn) {
+                const icon = activeBtn.querySelector('i');
+                const textSpan = activeBtn.querySelector('span');
+                let textClass = 'text-gray-800';
+                
+                if(tabId === 'community') { textClass = 'text-soft-pink'; icon.classList.add('text-soft-pink'); icon.classList.remove('text-gray-400');}
+                if(tabId === 'mypet') { textClass = 'text-soft-blue'; icon.classList.add('text-soft-blue'); icon.classList.remove('text-gray-400');}
+                if(tabId === 'ai-portrait') { textClass = 'text-soft-purple'; icon.classList.add('text-soft-purple'); icon.classList.remove('text-gray-400');}
+                if(tabId === 'ai-advisor') { textClass = 'text-orange-500'; icon.classList.add('text-orange-400'); icon.classList.remove('text-gray-400');}
+
+                textSpan.className = `text-xs font-bold ${textClass}`;
+            }
+            
+            if (tabId === 'mypet') renderPetProfile();
+            if (tabId === 'ai-advisor') {
+                renderChatPetSelector(); // 确保切换时渲染下拉
+            }
+            lucide.createIcons();
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').innerText = msg;
+            toast.classList.remove('hidden');
+            lucide.createIcons();
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        // --- 社区逻辑 ---
+        function togglePostBox() { document.getElementById('post-box').classList.toggle('hidden'); }
+
+        function handleImageUpload(event) {
+            const files = Array.from(event.target.files);
+            if (!files.length) return;
+            if (currentPostImages.length + files.length > MAX_IMAGES) { showToast(`最多只能上传 ${MAX_IMAGES} 张照片哦！`); return; }
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => { 
+                    if(currentPostImages.length < MAX_IMAGES) { currentPostImages.push(e.target.result); updateImagePreview(); }
+                };
+                reader.readAsDataURL(file);
+            });
+            event.target.value = '';
+        }
+
+        function updateImagePreview() {
+            const container = document.getElementById('image-preview-area');
+            container.innerHTML = '';
+            if (currentPostImages.length > 0) {
+                container.classList.remove('hidden');
+                document.getElementById('image-count-tip').innerText = `${currentPostImages.length}/${MAX_IMAGES}`;
+            } else {
+                container.classList.add('hidden');
+                document.getElementById('image-count-tip').innerText = '';
+            }
+            currentPostImages.forEach((src, index) => {
+                const div = document.createElement('div');
+                div.className = 'relative aspect-square rounded-xl overflow-hidden border border-gray-200 group';
+                div.innerHTML = `<img src="${src}" class="w-full h-full object-cover"><button onclick="removeImage(${index})" class="absolute top-1 right-1 bg-black/50 text-white p-1 rounded-full"><i data-lucide="x" width="12" height="12"></i></button>`;
+                container.appendChild(div);
+            });
+            lucide.createIcons();
+        }
+        function removeImage(index) { currentPostImages.splice(index, 1); updateImagePreview(); }
+        function clearImages() { currentPostImages = []; updateImagePreview(); }
+
+        function publishPost() {
+            const input = document.getElementById('post-content');
+            const content = input.value.trim();
+            if (!content && currentPostImages.length === 0) { showToast("写点什么或者发张图吧！🐶"); return; }
+
+            const postsContainer = document.getElementById('posts-container');
+            const randomName = FUN_USERNAMES[Math.floor(Math.random() * FUN_USERNAMES.length)];
+            const avatarSeed = randomName + Date.now();
+
+            let mediaHTML = '';
+            if (currentPostImages.length === 1) {
+                mediaHTML = `<div class="relative group"><img src="${currentPostImages[0]}" class="w-full object-cover max-h-96"></div>`;
+            } else if (currentPostImages.length > 1) {
+                let imagesMarkup = currentPostImages.map(src => `<div class="carousel-item w-full flex-shrink-0 snap-center relative"><img src="${src}" class="w-full aspect-square object-cover"></div>`).join('');
+                let dotsMarkup = currentPostImages.map((_, i) => `<div class="w-1.5 h-1.5 rounded-full bg-white/80 shadow-sm ${i===0?'w-3 bg-white':''}"></div>`).join('');
+                mediaHTML = `<div class="relative group w-full aspect-square bg-gray-100"><div class="carousel-container flex overflow-x-auto w-full h-full scrollbar-hide snap-x snap-mandatory">${imagesMarkup}</div><div class="absolute top-3 right-3 bg-black/50 p-1.5 rounded-lg backdrop-blur-sm"><i data-lucide="layers" size="16" class="text-white"></i></div><div class="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-1.5 px-2 py-1 rounded-full bg-black/20 backdrop-blur-sm">${dotsMarkup}</div></div>`;
+            } else {
+                mediaHTML = `<div class="relative group"><img src="https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=800&auto=format&fit=crop&q=60" class="w-full object-cover"></div>`;
+            }
+
+            const newPostHTML = `<div class="cute-card overflow-hidden break-inside-avoid animate-pop-in mb-6">${mediaHTML}<div class="p-5"><div class="flex items-center gap-3 mb-3"><div class="p-0.5 bg-gradient-to-tr from-purple-200 to-pink-200 rounded-full"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}" class="w-9 h-9 rounded-full bg-white border-2 border-white"></div><span class="font-bold text-gray-700 text-sm">${randomName}</span></div><p class="text-gray-600 text-sm mb-4 leading-relaxed">${content}</p><div class="flex justify-between items-center"><button class="flex items-center gap-1.5 text-gray-400 hover:text-pink-500 transition-colors group" onclick="likePost(this)"><div class="p-1.5 rounded-full bg-pink-50 group-hover:bg-pink-100 transition-colors"><i data-lucide="heart" size="16"></i></div><span class="text-xs font-bold count">0</span></button><button onclick="deletePost(this)" class="text-gray-300 hover:text-red-400 transition-colors"><i data-lucide="trash-2" size="16"></i></button></div></div></div>`;
+            postsContainer.insertAdjacentHTML('afterbegin', newPostHTML);
+            input.value = ''; clearImages(); togglePostBox(); lucide.createIcons();
+        }
+
+        function deletePost(btn) { deleteTarget = btn.closest('.cute-card'); document.getElementById('delete-modal').classList.remove('hidden'); }
+        function confirmDelete() { if (deleteTarget) { deleteTarget.remove(); deleteTarget = null; } document.getElementById('delete-modal').classList.add('hidden'); }
+        function cancelDelete() { deleteTarget = null; document.getElementById('delete-modal').classList.add('hidden'); }
+
+        function likePost(btn) {
+            const countSpan = btn.querySelector('.count') || btn.querySelector('span');
+            const icon = btn.querySelector('svg') || btn.querySelector('i'); 
+            if(!icon) return;
+            let count = parseInt(countSpan.innerText);
+            if (btn.classList.contains('liked')) {
+                count--; btn.classList.remove('liked');
+                icon.classList.remove('fill-current', 'text-pink-500');
+                btn.classList.remove('text-pink-500');
+            } else {
+                count++; btn.classList.add('liked');
+                icon.classList.add('fill-current', 'text-pink-500');
+                btn.classList.add('text-pink-500');
+            }
+            countSpan.innerText = count;
+        }
+
+        // --- 我的崽逻辑 ---
+        function renderPetSwitcher() {
+            const container = document.getElementById('pet-switcher');
+            const addButton = container.lastElementChild;
+            container.innerHTML = '';
+            pets.forEach((pet, index) => {
+                const isActive = index === activePetIndex;
+                const btn = document.createElement('button');
+                btn.className = `flex flex-col items-center gap-1 min-w-[60px] transition-transform ${isActive ? 'scale-110' : 'opacity-60 hover:opacity-100'}`;
+                btn.onclick = () => switchPet(index);
+                btn.innerHTML = `<div class="w-14 h-14 rounded-full p-0.5 ${isActive ? 'bg-gradient-to-tr from-soft-blue to-soft-purple' : 'bg-transparent'}"><div class="w-full h-full rounded-full border-2 border-white overflow-hidden"><img src="${pet.avatar}" class="w-full h-full object-cover"></div></div><span class="text-[10px] font-bold ${isActive ? 'text-soft-blue' : 'text-gray-400'}">${pet.name}</span>`;
+                container.appendChild(btn);
+            });
+            container.appendChild(addButton);
+        }
+
+        function switchPet(index) { 
+            activePetIndex = index; 
+            renderPetSwitcher(); 
+            renderPetProfile(); 
+            renderChatPetSelector(); // 切换时同步更新聊聊下拉
+        }
+
+        function renderPetProfile() {
+            const pet = pets[activePetIndex];
+            document.getElementById('display-name').innerText = pet.name;
+            document.getElementById('display-species-icon').innerText = pet.species === "猫" ? "🐱" : (pet.species === "狗" ? "🐶" : "🐰");
+            document.getElementById('display-breed').innerText = pet.breed;
+            document.getElementById('display-age').innerText = pet.age;
+            document.getElementById('display-age-box').innerText = pet.age;
+            document.getElementById('display-weight').innerText = pet.weight;
+            document.getElementById('display-avatar').src = pet.avatar;
+            document.getElementById('display-hobbies').innerHTML = pet.hobbies.map(h => `<span class="px-3 py-1 bg-white/50 text-gray-600 rounded-full text-xs font-bold border border-white shadow-sm">${h}</span>`).join('');
+            renderHealthTimeline(pet.records);
+        }
+
+        function renderHealthTimeline(records) {
+            const container = document.getElementById('health-timeline');
+            container.innerHTML = '';
+            const icons = { 'routine': 'syringe', 'checkup': 'stethoscope', 'vomit': 'frown', 'skin': 'bug', 'other': 'alert-circle' };
+            const colors = { 'routine': 'bg-soft-blue', 'checkup': 'bg-green-400', 'vomit': 'bg-orange-400', 'skin': 'bg-soft-pink', 'other': 'bg-gray-400' };
+            [...records].sort((a, b) => new Date(b.date) - new Date(a.date)).forEach((rec, idx) => {
+                const html = `<div class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group animate-pop-in" style="animation-delay: ${idx * 0.1}s"><div class="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white ${colors[rec.type]||'bg-gray-400'} shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 text-white"><i data-lucide="${icons[rec.type]||'activity'}" size="16"></i></div><div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded-xl border border-gray-100 shadow-sm"><div class="flex items-center justify-between space-x-2 mb-1"><div class="font-bold text-gray-700 text-sm">${rec.desc}</div><time class="font-mono text-[10px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded">${rec.date}</time></div></div></div>`;
+                container.insertAdjacentHTML('beforeend', html);
+            });
+            lucide.createIcons();
+        }
+
+        function openPetModal(isNew) {
+            isEditing = !isNew;
+            document.getElementById('modal-title').innerText = isNew ? "添加新宠物 ✨" : "编辑档案 ✏️";
+            
+            const yearSelect = document.getElementById('input-age-year');
+            const monthSelect = document.getElementById('input-age-month');
+            yearSelect.innerHTML = Array.from({length: 21}, (_, i) => `<option value="${i}">${i} 岁</option>`).join('');
+            monthSelect.innerHTML = Array.from({length: 12}, (_, i) => `<option value="${i}">${i} 个月</option>`).join('');
+
+            renderHobbyTags(isNew ? [] : pets[activePetIndex].hobbies);
+
+            if(isNew) {
+                document.getElementById('input-name').value = ''; 
+                yearSelect.value = '0'; monthSelect.value = '0';
+                document.getElementById('input-weight').value = ''; 
+                document.getElementById('input-hobby-custom').value = ''; 
+                document.getElementById('preview-avatar').src = 'https://api.dicebear.com/7.x/avataaars/svg?seed=NewPet';
+            } else {
+                const pet = pets[activePetIndex];
+                document.getElementById('input-name').value = pet.name; 
+                
+                const ageMatch = pet.age.match(/(\d+)岁\s*(\d+)个月/) || [0, 0, 0];
+                yearSelect.value = ageMatch[1] || 0;
+                monthSelect.value = ageMatch[2] || 0;
+
+                document.getElementById('input-weight').value = pet.weight; 
+                document.getElementById('input-species').value = pet.species; 
+                updateBreedOptions(); 
+                document.getElementById('input-breed').value = pet.breed; 
+                document.getElementById('preview-avatar').src = pet.avatar;
+            }
+            document.getElementById('pet-editor-modal').classList.remove('hidden');
+        }
+
+        function renderHobbyTags(selectedHobbies) {
+            const container = document.getElementById('hobby-tags-container');
+            container.innerHTML = '';
+            
+            const allHobbies = new Set([...PRESET_HOBBIES, ...selectedHobbies]);
+            
+            allHobbies.forEach(hobby => {
+                const isSelected = selectedHobbies.includes(hobby);
+                const btn = document.createElement('button');
+                btn.className = `hobby-tag px-3 py-1 rounded-full text-sm border transition-colors ${isSelected ? 'selected' : 'bg-white text-gray-500 border-gray-200 hover:border-soft-blue'}`;
+                btn.innerText = hobby;
+                btn.onclick = () => {
+                    btn.classList.toggle('selected');
+                    btn.classList.toggle('bg-white');
+                    btn.classList.toggle('text-gray-500');
+                    btn.classList.toggle('border-gray-200');
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function addCustomHobby() {
+            const input = document.getElementById('input-hobby-custom');
+            const val = input.value.trim();
+            if(val) {
+                const container = document.getElementById('hobby-tags-container');
+                const btn = document.createElement('button');
+                btn.className = `hobby-tag px-3 py-1 rounded-full text-sm border transition-colors selected`;
+                btn.innerText = val;
+                btn.onclick = () => {
+                    btn.classList.toggle('selected');
+                };
+                container.appendChild(btn);
+                input.value = ''; // 清空输入
+            }
+        }
+
+        function closePetModal() { document.getElementById('pet-editor-modal').classList.add('hidden'); }
+        function updateBreedOptions() {
+            const species = document.getElementById('input-species').value;
+            document.getElementById('input-breed').innerHTML = (breedOptions[species] || []).map(b => `<option value="${b}">${b}</option>`).join('');
+        }
+        function previewPetAvatar(event) {
+            const file = event.target.files[0];
+            if (file) { const reader = new FileReader(); reader.onload = (e) => document.getElementById('preview-avatar').src = e.target.result; reader.readAsDataURL(file); }
+        }
+        function savePet() {
+            const name = document.getElementById('input-name').value;
+            if (!name) return alert("请填写宠物名字！");
+            
+            const year = document.getElementById('input-age-year').value;
+            const month = document.getElementById('input-age-month').value;
+            const ageStr = `${year}岁 ${month}个月`;
+
+            // 修复：获取选中标签 + 输入框中残留的内容
+            const selectedTags = Array.from(document.querySelectorAll('.hobby-tag.selected')).map(el => el.innerText);
+            const manualInput = document.getElementById('input-hobby-custom').value.trim();
+            if(manualInput && !selectedTags.includes(manualInput)) {
+                selectedTags.push(manualInput);
+            }
+
+            const newPetData = {
+                name: name, 
+                age: ageStr, 
+                species: document.getElementById('input-species').value, 
+                breed: document.getElementById('input-breed').value, 
+                weight: document.getElementById('input-weight').value || "-", 
+                hobbies: selectedTags,
+                avatar: document.getElementById('preview-avatar').src, 
+                records: isEditing ? pets[activePetIndex].records : []
+            };
+            if (isEditing) { pets[activePetIndex] = { ...pets[activePetIndex], ...newPetData }; } else { newPetData.id = Date.now(); pets.push(newPetData); activePetIndex = pets.length - 1; }
+            closePetModal(); renderPetSwitcher(); renderPetProfile(); renderChatPetSelector();
+        }
+
+        function openHealthModal() { document.getElementById('health-editor-modal').classList.remove('hidden'); document.getElementById('health-date').valueAsDate = new Date(); }
+        function closeHealthModal() { document.getElementById('health-editor-modal').classList.add('hidden'); }
+        
+        function saveHealthRecord() {
+            // 修复：允许描述为空
+            const date = document.getElementById('health-date').value; 
+            const type = document.getElementById('health-symptom').value; 
+            const descVal = document.getElementById('health-desc').value.trim();
+            
+            const typeTextMap = { 'routine': '常规疫苗/驱虫', 'checkup': '定期体检', 'vomit': '呕吐/软便', 'skin': '皮肤/耳螨', 'other': '其他异常' };
+            const desc = descVal || typeTextMap[type]; 
+
+            pets[activePetIndex].records.push({ date, type, desc }); 
+            renderHealthTimeline(pets[activePetIndex].records); 
+            closeHealthModal(); 
+            document.getElementById('health-desc').value = "";
+        }
+
+        // --- 写真 & 聊天 ---
+        function selectStyle(el, style) {
+            document.querySelectorAll('.style-option').forEach(opt => opt.className = 'style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-transparent opacity-70 hover:opacity-100 hover:scale-105');
+            el.className = 'style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-soft-purple shadow-lg transform scale-105';
+            currentStyle = style;
+        }
+        function generateImage() {
+            const btn = document.getElementById('generate-btn');
+            btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> <span>魔法生成中...</span>'; lucide.createIcons();
+            document.getElementById('result-placeholder').classList.add('hidden'); document.getElementById('generated-result').classList.add('hidden'); document.getElementById('loading-indicator').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('loading-indicator').classList.add('hidden'); document.getElementById('generated-result').classList.remove('hidden'); document.getElementById('result-img').src = styleImages[currentStyle]; btn.disabled = false; btn.innerHTML = '<i data-lucide="wand-2"></i> <span>再次施法 ✨</span>'; lucide.createIcons();
+            }, 2500);
+        }
+
+        function handleKeyPress(e) { if(e.key === 'Enter') sendMessage(); }
+
+        // --- 聊天逻辑 ---
+        function renderChatPetSelector() {
+            const select = document.getElementById('chat-pet-select');
+            if (!select) return;
+            // 强制选中 activePetIndex
+            select.innerHTML = pets.map((pet, index) => 
+                `<option value="${index}">${pet.name}</option>`
+            ).join('');
+            select.value = activePetIndex; // 修复：显式设置 value 防止只有1个时未选中
+        }
+
+        function switchChatPet(val) {
+            const index = parseInt(val);
+            activePetIndex = index;
+            const container = document.getElementById('chat-container');
+            container.insertAdjacentHTML('beforeend', `<div class="text-center text-xs text-gray-400 my-2 animate-fade-in">已切换为 ${pets[index].name} 的病历本 📝</div>`);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim(); if (!text) return;
+            
+            const container = document.getElementById('chat-container');
+            const currentPet = pets[activePetIndex]; 
+            
+            container.insertAdjacentHTML('beforeend', `<div class="flex justify-end gap-2 animate-pop-in"><div class="max-w-[85%] p-3 rounded-2xl rounded-tr-none bg-soft-yellow text-orange-900 font-medium text-sm shadow-md">${text}</div><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Me" class="w-8 h-8 rounded-full border-2 border-white"></div>`);
+            input.value = ''; container.scrollTop = container.scrollHeight;
+            
+            const loadingId = 'typing-' + Date.now(); 
+            container.insertAdjacentHTML('beforeend', `<div id="${loadingId}" class="text-xs text-gray-400 ml-10 mb-2">对方正在输入...</div>`); 
+            container.scrollTop = container.scrollHeight;
+            
+            let aiResponseText = "";
+            try {
+                const API_URL = "http://localhost:8000/ask"; 
+                const enrichedQuestion = `我的宠物是${currentPet.species}，品种${currentPet.breed}，年龄${currentPet.age}，体重${currentPet.weight}kg。问题：${text}`;
+                
+                const response = await fetch(API_URL, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'accept': 'application/json' }, 
+                    body: JSON.stringify({ question: enrichedQuestion }) 
+                });
+                
+                if (!response.ok) throw new Error("Network response was not ok");
+
+                const data = await response.json(); 
+                aiResponseText = data.answer || "喵医生走神了... (API无返回)";
+                
+                // 成功逻辑：移除 loading，显示回复
+                document.getElementById(loadingId).remove();
+                container.insertAdjacentHTML('beforeend', `<div class="flex justify-start gap-2 animate-pop-in"><img src="https://api.dicebear.com/7.x/bottts/svg?seed=Doctor" class="w-8 h-8 rounded-full shadow-sm mt-1"><div class="max-w-[85%] p-3 rounded-2xl rounded-tl-none bg-white shadow-md text-gray-600 text-sm leading-relaxed border border-gray-100">${aiResponseText}</div></div>`);
+
+            } catch (error) {
+                // 失败逻辑：移除 loading，提示 Toast，不显示假回复
+                console.warn("API Error:", error);
+                document.getElementById(loadingId).remove();
+                showToast("API 连接失败，请检查后端服务 🔌");
+            }
+            
+            container.scrollTop = container.scrollHeight;
+        }
+
+        init(); switchTab('community');
+        function init() { renderPetSwitcher(); renderPetProfile(); updateBreedOptions(); }
+    </script>
+</body>
+</html>

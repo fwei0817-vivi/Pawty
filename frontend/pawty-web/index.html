@@ -7,6 +7,9 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Markdown 渲染 & 安全过滤 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
 
     <script>
@@ -287,18 +290,25 @@
             </div>
             <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div class="space-y-6">
-                    <div class="border-3 border-dashed border-soft-purple/30 rounded-3xl h-56 flex flex-col items-center justify-center bg-white/50 hover:bg-soft-purple/5 hover:border-soft-purple transition-all cursor-pointer group relative overflow-hidden">
-                        <div class="p-4 bg-white rounded-full shadow-md group-hover:scale-110 transition-transform duration-300 mb-3 z-10"><i data-lucide="upload-cloud" size="32" class="text-soft-purple"></i></div>
-                        <p class="text-sm font-bold text-gray-400 z-10">点我上传主子的美照</p>
+                    <div id="style-upload-area" class="border-3 border-dashed border-soft-purple/30 rounded-3xl h-56 flex flex-col items-center justify-center bg-white/50 hover:bg-soft-purple/5 hover:border-soft-purple transition-all cursor-pointer group relative overflow-hidden" onclick="triggerStyleUpload()" ondragover="handleStyleDrag(event)" ondrop="handleStyleDrop(event)">
+                        <input type="file" id="style-upload-input" class="hidden" accept="image/*" onchange="handleStyleUpload(event)">
+                        <div id="style-upload-empty" class="flex flex-col items-center justify-center text-center z-10 pointer-events-none">
+                            <div class="p-4 bg-white rounded-full shadow-md group-hover:scale-110 transition-transform duration-300 mb-3"><i data-lucide="upload-cloud" size="32" class="text-soft-purple"></i></div>
+                            <p class="text-sm font-bold text-gray-400">点击或拖拽上传主子的美照</p>
+                            <p class="text-[11px] text-gray-300 mt-1">支持 JPG/PNG，建议 1:1 构图</p>
+                        </div>
+                        <div id="style-upload-preview" class="hidden absolute inset-0">
+                            <img id="style-upload-preview-img" src="" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent"></div>
+                            <button type="button" onclick="clearStyleUpload(event)" class="absolute top-3 right-3 bg-white/80 text-gray-700 px-4 py-1.5 rounded-full text-xs font-bold shadow flex items-center gap-1">
+                                <i data-lucide="refresh-ccw" size="14"></i>
+                                <span>重新选择</span>
+                            </button>
+                        </div>
                     </div>
                     <div>
                         <h3 class="font-bold text-gray-700 mb-4">选择魔法风格</h3>
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div onclick="selectStyle(this, 'cyberpunk')" class="style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-soft-purple shadow-lg transform scale-105"><img src="download.jpeg" class="w-full h-full object-cover"><div class="absolute bottom-0 inset-x-0 bg-black/50 p-1 text-center"><span class="text-white text-[10px] font-bold">赛博朋克</span></div></div>
-                            <div onclick="selectStyle(this, 'watercolor')" class="style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-transparent opacity-70 hover:opacity-100 hover:scale-105"><img src="https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=400" class="w-full h-full object-cover"><div class="absolute bottom-0 inset-x-0 bg-black/50 p-1 text-center"><span class="text-white text-[10px] font-bold">水彩梦境</span></div></div>
-                            <div onclick="selectStyle(this, 'cartoon')" class="style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-transparent opacity-70 hover:opacity-100 hover:scale-105"><img src="https://images.unsplash.com/photo-1601643157091-ce5c665179ab?w=400" class="w-full h-full object-cover"><div class="absolute bottom-0 inset-x-0 bg-black/50 p-1 text-center"><span class="text-white text-[10px] font-bold">迪士尼</span></div></div>
-                            <div onclick="selectStyle(this, 'royal')" class="style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-transparent opacity-70 hover:opacity-100 hover:scale-105"><img src="https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=400" class="w-full h-full object-cover"><div class="absolute bottom-0 inset-x-0 bg-black/50 p-1 text-center"><span class="text-white text-[10px] font-bold">皇家油画</span></div></div>
-                        </div>
+                        <div id="style-options" class="grid grid-cols-2 sm:grid-cols-5 gap-3"></div>
                     </div>
                     <button id="generate-btn" onclick="generateImage()" class="w-full py-4 rounded-2xl font-bold text-white shadow-xl shadow-soft-purple/30 bg-gradient-to-r from-soft-purple to-indigo-400 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 text-lg"><i data-lucide="wand-2"></i><span>施展魔法 ✨</span></button>
                 </div>
@@ -343,7 +353,37 @@
     <script>
         lucide.createIcons();
 
+        const API_ENDPOINTS = {
+            rag: "http://localhost:8001/ask",
+            style: "http://localhost:8011"
+        };
+
+        /**
+         * Render markdown to sanitized HTML.
+         * @param {string} text
+         * @returns {string} safe HTML
+         */
+        function renderMarkdown(text = "") {
+            try {
+                const html = marked.parse(text);
+                return DOMPurify.sanitize(html);
+            } catch (error) {
+                console.warn("Markdown render error", error);
+                return text;
+            }
+        }
+
         // --- 数据配置 ---
+        const FUN_USERNAMES = ["Pawsome", "MeowMix", "Zoomies", "Doggo", "KittyCat", "FluffBall", "BorkBork", "Purrfect", "TailWag", "FurryFriend"];
+        const PRESET_HOBBIES = ['睡觉', '干饭', '跑酷', '晒太阳', '抓老鼠', '拆家', '发呆', '撒娇', '玩球', '洗澡'];
+        const MAX_IMAGES = 6;
+
+        const breedOptions = {
+            "猫": ["英短蓝猫", "美短", "布偶猫", "中华田园猫", "波斯猫", "暹罗猫", "无毛猫", "缅因猫", "斯芬克斯", "俄罗斯蓝猫", "加菲猫"],
+            "狗": ["金毛", "柯基", "拉布拉多", "哈士奇", "柴犬", "泰迪", "边牧", "萨摩耶", "比熊", "德牧"],
+            "其他": ["兔子", "仓鼠", "鹦鹉", "乌龟"]
+        };
+
         let pets = [
             {
                 id: 1,
@@ -360,30 +400,27 @@
                 ]
             }
         ];
-        
-        const breedOptions = {
-            "猫": ["英短蓝猫", "美短", "布偶猫", "中华田园猫", "波斯猫", "暹罗猫", "无毛猫", "缅因猫", "斯芬克斯", "俄罗斯蓝猫", "加菲猫"],
-            "狗": ["金毛", "柯基", "拉布拉多", "哈士奇", "柴犬", "泰迪", "边牧", "萨摩耶", "比熊", "德牧"],
-            "其他": ["兔子", "仓鼠", "鹦鹉", "乌龟"]
-        };
 
-        const PRESET_HOBBIES = ['睡觉', '干饭', '跑酷', '晒太阳', '抓老鼠', '拆家', '发呆', '撒娇', '玩球', '洗澡'];
-        const FUN_USERNAMES = ["Pawsome", "MeowMix", "Zoomies", "Doggo", "KittyCat", "FluffBall", "BorkBork", "Purrfect", "TailWag", "FurryFriend"];
-        
+        const STYLE_PRESETS = [
+            { id: "1", title: "厚涂油画", prompt: "Oil Painting, thick strokes, textured canvas", cover: "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=400&q=60" },
+            { id: "2", title: "皮克斯 3D", prompt: "Pixar style, disney 3d render, cute, vibrant", cover: "https://images.unsplash.com/photo-1517849845537-4d257902454a?w=400&q=60" },
+            { id: "3", title: "赛博朋克", prompt: "Cyberpunk, neon lights, mechanical parts, sci-fi", cover: "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?w=400&q=60" },
+            { id: "4", title: "铅笔素描", prompt: "Pencil sketch, graphite, monochrome, rough lines", cover: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=400&q=60" },
+            { id: "5", title: "吉卜力动漫", prompt: "Ghibli style, anime, vibrant colors, detailed background", cover: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=400&q=60" },
+        ];
+
         let activePetIndex = 0;
         let isEditing = false;
         let currentPostImages = [];
-        const MAX_IMAGES = 6;
         let deleteTarget = null;
-        let currentStyle = 'cyberpunk';
-        const styleImages = {
-            'cyberpunk': 'https://images.unsplash.com/photo-1615751072497-5f5169febe33?w=800',
-            'watercolor': 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=800',
-            'cartoon': 'https://images.unsplash.com/photo-1601643157091-ce5c665179ab?w=800',
-            'royal': 'https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=800'
-        };
+        let selectedStyleId = "1";
+        let uploadedStyleFile = null;
+        let stylePreviewUrl = null;
 
-        // --- 通用逻辑 ---
+        /**
+         * 切换页面 tab。
+         * @param {string} tabId
+         */
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById(tabId).classList.remove('hidden');
@@ -422,17 +459,30 @@
             lucide.createIcons();
         }
 
-        function showToast(msg) {
+        /**
+         * 顶部 Toast 提示。
+         * @param {string} message
+         */
+        function showToast(message) {
             const toast = document.getElementById('toast');
-            document.getElementById('toast-message').innerText = msg;
+            const toastMsg = document.getElementById('toast-message');
+            if (!toast || !toastMsg) return;
+            toastMsg.innerText = message;
             toast.classList.remove('hidden');
             lucide.createIcons();
             setTimeout(() => toast.classList.add('hidden'), 3000);
         }
 
         // --- 社区逻辑 ---
-        function togglePostBox() { document.getElementById('post-box').classList.toggle('hidden'); }
+        /** 展开/收起发帖框 */
+        function togglePostBox() {
+            document.getElementById('post-box').classList.toggle('hidden');
+        }
 
+        /**
+         * 处理发帖图片上传。
+         * @param {Event} event
+         */
         function handleImageUpload(event) {
             const files = Array.from(event.target.files);
             if (!files.length) return;
@@ -447,6 +497,7 @@
             event.target.value = '';
         }
 
+        /** 更新发帖图片预览 */
         function updateImagePreview() {
             const container = document.getElementById('image-preview-area');
             container.innerHTML = '';
@@ -465,9 +516,19 @@
             });
             lucide.createIcons();
         }
-        function removeImage(index) { currentPostImages.splice(index, 1); updateImagePreview(); }
-        function clearImages() { currentPostImages = []; updateImagePreview(); }
+        /** 移除指定索引图片 */
+        function removeImage(index) {
+            currentPostImages.splice(index, 1);
+            updateImagePreview();
+        }
 
+        /** 清空所有上传图片 */
+        function clearImages() {
+            currentPostImages = [];
+            updateImagePreview();
+        }
+
+        /** 发表帖子 */
         function publishPost() {
             const input = document.getElementById('post-content');
             const content = input.value.trim();
@@ -493,10 +554,28 @@
             input.value = ''; clearImages(); togglePostBox(); lucide.createIcons();
         }
 
-        function deletePost(btn) { deleteTarget = btn.closest('.cute-card'); document.getElementById('delete-modal').classList.remove('hidden'); }
-        function confirmDelete() { if (deleteTarget) { deleteTarget.remove(); deleteTarget = null; } document.getElementById('delete-modal').classList.add('hidden'); }
-        function cancelDelete() { deleteTarget = null; document.getElementById('delete-modal').classList.add('hidden'); }
+        /** 打开删除确认 */
+        function deletePost(btn) {
+            deleteTarget = btn.closest('.cute-card');
+            document.getElementById('delete-modal').classList.remove('hidden');
+        }
 
+        /** 确认删除 */
+        function confirmDelete() {
+            if (deleteTarget) {
+                deleteTarget.remove();
+                deleteTarget = null;
+            }
+            document.getElementById('delete-modal').classList.add('hidden');
+        }
+
+        /** 取消删除 */
+        function cancelDelete() {
+            deleteTarget = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+        }
+
+        /** 点赞/取消点赞 */
         function likePost(btn) {
             const countSpan = btn.querySelector('.count') || btn.querySelector('span');
             const icon = btn.querySelector('svg') || btn.querySelector('i'); 
@@ -515,6 +594,7 @@
         }
 
         // --- 我的崽逻辑 ---
+        /** 渲染宠物切换器 */
         function renderPetSwitcher() {
             const container = document.getElementById('pet-switcher');
             const addButton = container.lastElementChild;
@@ -530,6 +610,7 @@
             container.appendChild(addButton);
         }
 
+        /** 切换当前宠物 */
         function switchPet(index) { 
             activePetIndex = index; 
             renderPetSwitcher(); 
@@ -537,6 +618,7 @@
             renderChatPetSelector(); // 切换时同步更新聊聊下拉
         }
 
+        /** 渲染当前宠物档案 */
         function renderPetProfile() {
             const pet = pets[activePetIndex];
             document.getElementById('display-name').innerText = pet.name;
@@ -550,6 +632,10 @@
             renderHealthTimeline(pet.records);
         }
 
+        /**
+         * 渲染健康时间线。
+         * @param {Array<{date:string,type:string,desc:string}>} records
+         */
         function renderHealthTimeline(records) {
             const container = document.getElementById('health-timeline');
             container.innerHTML = '';
@@ -562,6 +648,10 @@
             lucide.createIcons();
         }
 
+        /**
+         * 打开宠物编辑弹窗。
+         * @param {boolean} isNew
+         */
         function openPetModal(isNew) {
             isEditing = !isNew;
             document.getElementById('modal-title').innerText = isNew ? "添加新宠物 ✨" : "编辑档案 ✏️";
@@ -596,6 +686,10 @@
             document.getElementById('pet-editor-modal').classList.remove('hidden');
         }
 
+        /**
+         * 渲染爱好标签。
+         * @param {string[]} selectedHobbies
+         */
         function renderHobbyTags(selectedHobbies) {
             const container = document.getElementById('hobby-tags-container');
             container.innerHTML = '';
@@ -617,6 +711,7 @@
             });
         }
 
+        /** 添加自定义爱好 */
         function addCustomHobby() {
             const input = document.getElementById('input-hobby-custom');
             const val = input.value.trim();
@@ -633,15 +728,23 @@
             }
         }
 
+        /** 关闭宠物编辑弹窗 */
         function closePetModal() { document.getElementById('pet-editor-modal').classList.add('hidden'); }
+
+        /** 更新品种选项 */
         function updateBreedOptions() {
             const species = document.getElementById('input-species').value;
             document.getElementById('input-breed').innerHTML = (breedOptions[species] || []).map(b => `<option value="${b}">${b}</option>`).join('');
         }
+        /**
+         * 预览宠物头像。
+         * @param {Event} event
+         */
         function previewPetAvatar(event) {
             const file = event.target.files[0];
             if (file) { const reader = new FileReader(); reader.onload = (e) => document.getElementById('preview-avatar').src = e.target.result; reader.readAsDataURL(file); }
         }
+        /** 保存宠物档案 */
         function savePet() {
             const name = document.getElementById('input-name').value;
             if (!name) return alert("请填写宠物名字！");
@@ -671,11 +774,13 @@
             closePetModal(); renderPetSwitcher(); renderPetProfile(); renderChatPetSelector();
         }
 
+        /** 打开健康记录弹窗 */
         function openHealthModal() { document.getElementById('health-editor-modal').classList.remove('hidden'); document.getElementById('health-date').valueAsDate = new Date(); }
+        /** 关闭健康记录弹窗 */
         function closeHealthModal() { document.getElementById('health-editor-modal').classList.add('hidden'); }
         
+        /** 保存健康记录（描述允许为空） */
         function saveHealthRecord() {
-            // 修复：允许描述为空
             const date = document.getElementById('health-date').value; 
             const type = document.getElementById('health-symptom').value; 
             const descVal = document.getElementById('health-desc').value.trim();
@@ -690,18 +795,153 @@
         }
 
         // --- 写真 & 聊天 ---
-        function selectStyle(el, style) {
-            document.querySelectorAll('.style-option').forEach(opt => opt.className = 'style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-transparent opacity-70 hover:opacity-100 hover:scale-105');
+        function selectStyle(el, styleId) {
+            document.querySelectorAll('.style-option').forEach(opt => {
+                opt.className = 'style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-transparent opacity-70 hover:opacity-100 hover:scale-105';
+            });
             el.className = 'style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-soft-purple shadow-lg transform scale-105';
-            currentStyle = style;
+            selectedStyleId = styleId;
         }
-        function generateImage() {
+        function triggerStyleUpload() {
+            document.getElementById('style-upload-input')?.click();
+        }
+        function handleStyleUpload(event) {
+            const file = event?.target?.files?.[0];
+            applyStyleFile(file);
+        }
+        function handleStyleDrag(event) {
+            event.preventDefault();
+        }
+        function handleStyleDrop(event) {
+            event.preventDefault();
+            const file = event.dataTransfer?.files?.[0];
+            applyStyleFile(file);
+        }
+        function applyStyleFile(file) {
+            if (!file) return;
+            if (!file.type?.startsWith('image/')) {
+                showToast("只支持图片文件哦～");
+                return;
+            }
+            if (file.size > 8 * 1024 * 1024) {
+                showToast("图片有点大 (最大 8MB)，请压缩后再试");
+                return;
+            }
+            if (stylePreviewUrl) {
+                URL.revokeObjectURL(stylePreviewUrl);
+            }
+            uploadedStyleFile = file;
+            stylePreviewUrl = URL.createObjectURL(file);
+            updateStylePreviewUI(true);
+            document.getElementById('generated-result')?.classList.add('hidden');
+            document.getElementById('loading-indicator')?.classList.add('hidden');
+            document.getElementById('result-placeholder')?.classList.remove('hidden');
+        }
+        function updateStylePreviewUI(hasPreview) {
+            const empty = document.getElementById('style-upload-empty');
+            const preview = document.getElementById('style-upload-preview');
+            const img = document.getElementById('style-upload-preview-img');
+            if (!empty || !preview || !img) return;
+            if (hasPreview && stylePreviewUrl) {
+                img.src = stylePreviewUrl;
+                empty.classList.add('hidden');
+                preview.classList.remove('hidden');
+            } else {
+                img.src = '';
+                empty.classList.remove('hidden');
+                preview.classList.add('hidden');
+            }
+        }
+        function clearStyleUpload(event) {
+            if (event) event.stopPropagation();
+            const input = document.getElementById('style-upload-input');
+            if (input) input.value = '';
+            uploadedStyleFile = null;
+            if (stylePreviewUrl) {
+                URL.revokeObjectURL(stylePreviewUrl);
+                stylePreviewUrl = null;
+            }
+            updateStylePreviewUI(false);
+        }
+        function normalizeSpeciesForApi(species) {
+            if (species === "猫") return "cat";
+            if (species === "狗") return "dog";
+            return species || "pet";
+        }
+
+        function renderStyleOptions() {
+            const container = document.getElementById('style-options');
+            if (!container) return;
+            container.innerHTML = '';
+            STYLE_PRESETS.forEach((preset, idx) => {
+                const isActive = preset.id === selectedStyleId;
+                const classes = isActive
+                    ? 'style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-soft-purple shadow-lg transform scale-105'
+                    : 'style-option cursor-pointer relative rounded-2xl overflow-hidden aspect-square border-4 border-transparent opacity-70 hover:opacity-100 hover:scale-105';
+                const card = document.createElement('div');
+                card.className = classes;
+                card.onclick = () => selectStyle(card, preset.id);
+                card.innerHTML = `
+                    <img src="${preset.cover}" class="w-full h-full object-cover">
+                    <div class="absolute bottom-0 inset-x-0 bg-black/50 p-1 text-center">
+                        <span class="text-white text-[10px] font-bold">${preset.title}</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function generateImage() {
+            if (!uploadedStyleFile) {
+                showToast("请先上传主子的美照再施法 ✨");
+                return;
+            }
+            const currentPet = pets[activePetIndex] || {};
+            const speciesForApi = normalizeSpeciesForApi(currentPet.species || "pet");
             const btn = document.getElementById('generate-btn');
-            btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> <span>魔法生成中...</span>'; lucide.createIcons();
-            document.getElementById('result-placeholder').classList.add('hidden'); document.getElementById('generated-result').classList.add('hidden'); document.getElementById('loading-indicator').classList.remove('hidden');
-            setTimeout(() => {
-                document.getElementById('loading-indicator').classList.add('hidden'); document.getElementById('generated-result').classList.remove('hidden'); document.getElementById('result-img').src = styleImages[currentStyle]; btn.disabled = false; btn.innerHTML = '<i data-lucide="wand-2"></i> <span>再次施法 ✨</span>'; lucide.createIcons();
-            }, 2500);
+            const placeholder = document.getElementById('result-placeholder');
+            const loading = document.getElementById('loading-indicator');
+            const result = document.getElementById('generated-result');
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> <span>魔法生成中...</span>';
+            lucide.createIcons();
+            placeholder.classList.add('hidden');
+            result.classList.add('hidden');
+            loading.classList.remove('hidden');
+            const formData = new FormData();
+            formData.append('style_id', selectedStyleId);
+            formData.append('species', speciesForApi);
+            formData.append('image', uploadedStyleFile);
+            try {
+                const response = await fetch(`${API_ENDPOINTS.style}/stylize`, {
+                    method: 'POST',
+                    body: formData
+                });
+                let data = null;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    console.warn("无法解析变身返回", parseError);
+                }
+                if (!response.ok) {
+                    const detail = data?.detail || '风格服务返回异常';
+                    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+                }
+                if (!data?.image_base64) {
+                    throw new Error('变身结果为空');
+                }
+                document.getElementById('result-img').src = `data:image/png;base64,${data.image_base64}`;
+                result.classList.remove('hidden');
+            } catch (error) {
+                console.error("Style API Error:", error);
+                placeholder.classList.remove('hidden');
+                showToast(`魔法失败：${error.message}`);
+            } finally {
+                loading.classList.add('hidden');
+                btn.disabled = false;
+                btn.innerHTML = '<i data-lucide="wand-2"></i> <span>再次施法 ✨</span>';
+                lucide.createIcons();
+            }
         }
 
         function handleKeyPress(e) { if(e.key === 'Enter') sendMessage(); }
@@ -741,36 +981,52 @@
             
             let aiResponseText = "";
             try {
-                const API_URL = "http://localhost:8000/ask"; 
                 const enrichedQuestion = `我的宠物是${currentPet.species}，品种${currentPet.breed}，年龄${currentPet.age}，体重${currentPet.weight}kg。问题：${text}`;
+                const payload = {
+                    question: enrichedQuestion,
+                    species: currentPet.species,
+                    breed: currentPet.breed,
+                    top_k: 4
+                };
                 
-                const response = await fetch(API_URL, { 
+                const response = await fetch(API_ENDPOINTS.rag, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json', 'accept': 'application/json' }, 
-                    body: JSON.stringify({ question: enrichedQuestion }) 
+                    body: JSON.stringify(payload) 
                 });
-                
-                if (!response.ok) throw new Error("Network response was not ok");
+                let data = null;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    console.warn("RAG 返回解析失败", parseError);
+                }
+                if (!response.ok) {
+                    throw new Error(data?.error || 'RAG 服务异常');
+                }
 
-                const data = await response.json(); 
-                aiResponseText = data.answer || "喵医生走神了... (API无返回)";
+                aiResponseText = data?.answer || "喵医生走神了... (API无返回)";
                 
-                // 成功逻辑：移除 loading，显示回复
+                // 成功逻辑：移除 loading，渲染 Markdown 回复
                 document.getElementById(loadingId).remove();
-                container.insertAdjacentHTML('beforeend', `<div class="flex justify-start gap-2 animate-pop-in"><img src="https://api.dicebear.com/7.x/bottts/svg?seed=Doctor" class="w-8 h-8 rounded-full shadow-sm mt-1"><div class="max-w-[85%] p-3 rounded-2xl rounded-tl-none bg-white shadow-md text-gray-600 text-sm leading-relaxed border border-gray-100">${aiResponseText}</div></div>`);
+                const bubble = document.createElement('div');
+                bubble.className = 'flex justify-start gap-2 animate-pop-in';
+                bubble.innerHTML = `<img src="https://api.dicebear.com/7.x/bottts/svg?seed=Doctor" class="w-8 h-8 rounded-full shadow-sm mt-1"><div class="max-w-[85%] p-3 rounded-2xl rounded-tl-none bg-white shadow-md text-gray-600 text-sm leading-relaxed border border-gray-100 prose prose-sm prose-slate"></div>`;
+                const content = bubble.querySelector('div:nth-child(2)') || bubble.lastElementChild;
+                content.innerHTML = renderMarkdown(aiResponseText);
+                container.appendChild(bubble);
 
             } catch (error) {
                 // 失败逻辑：移除 loading，提示 Toast，不显示假回复
                 console.warn("API Error:", error);
                 document.getElementById(loadingId).remove();
-                showToast("API 连接失败，请检查后端服务 🔌");
+                showToast("聊天小助手开小差了，请检查 RAG 服务 🔌");
             }
             
             container.scrollTop = container.scrollHeight;
         }
 
         init(); switchTab('community');
-        function init() { renderPetSwitcher(); renderPetProfile(); updateBreedOptions(); }
+        function init() { renderPetSwitcher(); renderPetProfile(); updateBreedOptions(); renderStyleOptions(); }
     </script>
 </body>
 </html>

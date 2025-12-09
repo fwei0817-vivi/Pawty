@@ -1,5 +1,6 @@
 accelerate==0.27.2
 diffusers==0.26.3
+fastapi==0.110.2
 filelock==3.13.1
 fsspec==2024.2.0
 huggingface-hub==0.21.4
@@ -7,6 +8,8 @@ importlib-metadata==7.0.1
 numpy==1.26.4
 packaging==23.2
 Pillow==10.2.0
+python-multipart==0.0.9
+pydantic==2.8.2
 psutil==5.9.8
 pyyaml==6.0.1
 regex==2023.12.25
@@ -18,3 +21,4 @@ torchvision==0.17.1
 tqdm==4.66.2
 transformers==4.38.2
 typing-extensions==4.9.0
+uvicorn[standard]==0.30.1

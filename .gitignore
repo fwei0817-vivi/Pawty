@@ -1,0 +1,5 @@
+.venv/
+backend/image-style/.venv/
+*.log
+__pycache__/
+llm/rag-service/.env

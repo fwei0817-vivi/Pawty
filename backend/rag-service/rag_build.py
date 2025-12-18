@@ -6,10 +6,10 @@ Pawty RAG Backend:
 - Report metrics to rag_monitor.py (/log)
 
 Usage:
-  # 1) 构建向量库（只需在数据更新后执行一次）
+  # 1) Build vector database (run once after data updates)
   python rag_build.py --build
 
-  # 2) 启动服务（提供 /ask 接口）
+  # 2) Start service (provides /ask endpoint)
   python rag_build.py --serve --port 8001
 """
 
@@ -37,22 +37,22 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from openai import OpenAI
 
 
-# ============= 全局配置 =============
+# ============= Global Configuration =============
 
 BASE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = BASE_DIR.parent.parent
 DATA_DIR = REPO_ROOT / "data" / "knowledge"
 VECTORSTORE_DIR = REPO_ROOT / "data" / "vectorstores" / "chroma_pawty"
 
-DATA_GLOB = str(DATA_DIR / "*.jsonl")          # 你的知识数据（爬虫输出）
-PERSIST_DIR = str(VECTORSTORE_DIR)      # 向量库持久化目录
+DATA_GLOB = str(DATA_DIR / "*.jsonl")          # Knowledge data (crawler output)
+PERSIST_DIR = str(VECTORSTORE_DIR)      # Vector store persistence directory
 COLLECTION_NAME = "pawty_v1"
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 TOP_K_DEFAULT = 5
 
 # FastAPI app
 app = FastAPI(title="Pawty RAG API", version="1.0.0")
-# 开放跨域，便于本地前端 (8080) 调用 8001
+# Enable CORS for local frontend (8080) to call 8001
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -60,20 +60,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 全局向量库实例
+# Global vector database instance
 vectordb: Optional[Chroma] = None
 
-# 加载 .env（可选）
+# Load .env (optional)
 load_dotenv()
 
 # OpenAI client
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
-    print("⚠️  WARNING: OPENAI_API_KEY not set. /ask 会报错，请先在环境中设置。")
+    print("⚠️  WARNING: OPENAI_API_KEY not set. /ask will fail, please set it in environment variables.")
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 
-# ============= 数据加载 & 建库 =============
+# ============= Data Loading & Index Building =============
 
 def load_jsonl_files(pattern: str) -> List[Dict[str, Any]]:
     records = []
@@ -116,7 +116,7 @@ def build_index():
             docs.append(d)
 
     if not docs:
-        raise RuntimeError("No documents found under ./data. 请先准备 JSONL 数据。")
+        raise RuntimeError("No documents found under ./data. Please prepare JSONL data first.")
 
     print(f"📚 Loaded {len(docs)} docs. Splitting into chunks ...")
     splitter = RecursiveCharacterTextSplitter(
@@ -132,7 +132,7 @@ def build_index():
     emb = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
 
     print("🧱 Creating Chroma DB ...")
-    # 先清空旧库
+    # Clear old collection first
     db = Chroma(
         collection_name=COLLECTION_NAME,
         embedding_function=emb,
@@ -154,7 +154,7 @@ def build_index():
 
 
 def load_vectordb() -> Chroma:
-    """在 serve 模式中加载向量库到全局变量"""
+    """Load vector database to global variable in serve mode"""
     global vectordb
     if vectordb is not None:
         return vectordb
@@ -170,7 +170,7 @@ def load_vectordb() -> Chroma:
     return vectordb
 
 
-# ============= RAG 检索 + 生成 =============
+# ============= RAG Retrieval + Generation =============
 
 def filter_by_metadata(
     docs: List[Document],
@@ -180,7 +180,7 @@ def filter_by_metadata(
     topic: Optional[str] = None,
     top_k: int = TOP_K_DEFAULT,
 ) -> List[Document]:
-    """根据 metadata 做简单过滤，不足再用相似度结果补齐"""
+    """Filter by metadata, then fill remaining slots with similarity results"""
     res = []
     for d in docs:
         m = d.metadata or {}
@@ -222,16 +222,23 @@ def format_context(docs: List[Document]) -> str:
 
 def call_openai(question: str, retrieved_docs: List[Document]):
     if client is None:
-        raise RuntimeError("OPENAI_API_KEY not set. 请先设置环境变量。")
+        raise RuntimeError("OPENAI_API_KEY not set. Please set environment variable first.")
 
     context = format_context(retrieved_docs)
     system_prompt = (
         "You are a veterinary-informed pet care assistant for cats and dogs.\n"
+        "\n"
         "Rules:\n"
-        "- Only use the provided context; if information is missing, say you're unsure and recommend seeing a veterinarian.\n"
-        "- Be specific by species/life stage if available. Use clear bullet points.\n"
-        "- Always include inline citations like [1], [2] referring to the context block indices.\n"
-        "- Add a brief safety note if advice relates to medication/supplements.\n"
+        "- Use the provided context as the primary source of information.\n"
+        "- All factual claims MUST be directly supported by at least one context block and cited.\n"
+        "- You MAY add high-level organizational or connective statements\n"
+        "  (e.g., section headers or brief summaries),\n"
+        "  but clearly label them as \"Based on general veterinary knowledge\" and do NOT cite them.\n"
+        "- Do NOT introduce new factual claims outside the context.\n"
+        "- If the context does not fully answer the question, explicitly state which aspects are not covered.\n"
+        "- Be specific by species and life stage when mentioned in the context.\n"
+        "- Use clear bullet points.\n"
+        "- Each factual bullet must end with citations like [1], [2].\n"
         "- Neutral, educational tone.\n"
     )
     user_prompt = (
@@ -260,11 +267,11 @@ def call_openai(question: str, retrieved_docs: List[Document]):
 
 
 def retrieve(db: Chroma, query: str, k: int = TOP_K_DEFAULT) -> List[Document]:
-    # 先取 20 个，再用 metadata 过滤
+    # Retrieve 20 documents first, then filter by metadata
     return db.similarity_search(query, k=20)
 
 
-# ============= FastAPI 模型 & 路由 =============
+# ============= FastAPI Models & Routes =============
 
 class AskBody(BaseModel):
     question: str
@@ -348,7 +355,7 @@ def ask_api(body: AskBody):
     return response
 
 
-# ============= CLI 入口 =============
+# ============= CLI Entry Point =============
 
 def main():
     parser = argparse.ArgumentParser()

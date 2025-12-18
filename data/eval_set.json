@@ -1,0 +1,49 @@
+[
+  {
+    "eval_id": "eval_001",
+    "question": "Are dogs omnivores or carnivores?",
+    "reference_answer": "Dogs are considered omnivores from a nutritional standpoint. Domestic dogs have three gene mutations associated with key roles in starch digestion and glucose absorption that are different from those of wolves, resulting in increased adaptation to carbohydrate-rich food.",
+    "relevant_docs": [
+      "Domestic dogs and cats are both members of the order Carnivora. Observations of feral canids indicate that their feeding habits are broad and include various parts of plants as well as both small and large prey. Furthermore, the genome of the domestic dog is different from that of the wolf. For example, domestic dogs have three gene mutations associated with key roles in starch digestion and glucose absorptions that are different from those of wolves. As a result, the domestic dog shows an increased adaptation to carbohydrate-rich food, and from a nutritional standpoint, dogs are considered omnivores."
+    ]
+  },
+  {
+    "eval_id": "eval_002",
+    "question": "What is the difference between cats and dogs in terms of nutrition?",
+    "reference_answer": "Cats are obligate carnivores that require animal tissues for essential nutrients like taurine, arginine, arachidonic acid, vitamin A, and vitamin D. Dogs are omnivores and can adapt to carbohydrate-rich diets. Cats have a more recent domestication history compared to dogs.",
+    "relevant_docs": [
+      "In contrast, cats have a relatively recent history of domestication, resulting in a more modest number of genome regions with strong signals of selection compared to dogs, and the predominant genotypic changes in cats reported to date are associated with behavioral modifications.",
+      "However, from a nutritional standpoint, cats are still classified as obligate or true carnivores because they have metabolic adaptations that result in nutritional requirements that can only be met via a diet that includes animal tissues (ie, taurine, arginine, arachidonic acid, vitamin A, and vitamin D).",
+      "As a result, the domestic dog shows an increased adaptation to carbohydrate-rich food, and from a nutritional standpoint, dogs are considered omnivores."
+    ]
+  },
+  {
+    "eval_id": "eval_003",
+    "question": "What should I look for when selecting pet food?",
+    "reference_answer": "When selecting pet food, focus on nutrient content rather than just ingredient lists. Consider whether the company conducts research, employs experts like Board Certified Veterinary Nutritionists, and follows WSAVA recommendations. Look for complete and balanced diets appropriate for your pet's life stage.",
+    "relevant_docs": [
+      "It is common for pet owners to focus heavily on ingredient lists when determining quality of pet food, such as looking for real meat listed first on the ingredient list or avoiding certain other ingredients. However, animals require nutrients, not ingredients, and two pet foods with very similar ingredient lists on the package label can differ in quality.",
+      "Therefore, other considerations when selecting pet foods may include whether the company conducts research on their diets to support their claims and the safety of the food, or whether they employ a team of experts such as Board Certified Veterinary Nutritionists, experienced pet food formulators, animal nutritionists with an MS or PhD, food safety specialists, microbiologists, or toxicologists. The World Small Animal Veterinary Association (WSAVA) has more general, global recommendations for selecting pet foods.",
+      "Feeding a complete and balanced diet, defined as a diet that provides all the nutrients a healthy dog or cat requires for a specific life stage, is critical for overall health in dogs and cats."
+    ]
+  },
+  {
+    "eval_id": "eval_004",
+    "question": "What is body condition score (BCS) and why is it important?",
+    "reference_answer": "Body condition score (BCS) is a semiquantitative assessment of body fat composition that ranges from cachectic to severely obese. It is used along with body weight to estimate nutritional adequacy and determine ideal body weight. BCS helps assess whether a pet is underweight, ideal, or overweight.",
+    "relevant_docs": [
+      "Body weight in combination with body condition score (BCS) is used in many species to provide an estimate of nutritional adequacy and can help determine ideal body weight. BCS is a semiquantitative assessment of body fat composition that ranges from cachectic to severely obese.",
+      "Although body condition score is inherently subjective, as long as specific criteria are applied, it is a reliable way of estimating body fat levels in dogs and cats."
+    ]
+  },
+  {
+    "eval_id": "eval_005",
+    "question": "What are the risks of feeding raw meat-based diets to pets?",
+    "reference_answer": "Raw meat-based diets pose several risks including nutrient imbalances, dental injury, gastrointestinal obstruction or perforation, and exposure to pathogens like Salmonella, E. coli, and other zoonotic bacteria. Pets may shed these pathogens in feces, exposing humans in the home environment.",
+    "relevant_docs": [
+      "One of the biggest areas of controversy surrounding these types of diets is the safety of these diets to not only the pets consuming them but to the pet owners and others who are exposed to the animals consuming them. Nutrient imbalances, dental injury, gastrointestinal obstruction or perforation, and exposure to pathogens are all risks associated with RMBDs.",
+      "Even if a pet owner takes precautions while handling and preparing these diets, the Salmonella contamination rates for beef and pork intended for human consumption are estimated to range from 3.5%–4%. Animals fed uncooked diets may become clinically ill as a result or may shed these pathogens in their feces, thereby exposing humans in the home environment."
+    ]
+  }
+]
+

@@ -45,7 +45,7 @@ When deploying to production, remember to update the `API_ENDPOINTS` in `fronten
 
 ### 2. Image Style Service (Transformation)
 
-####1. Start the Backend Server
+#### 1. Start the Backend Server
 Open the backend_server.ipynb file included in the project.
 
 Click the "Open in Colab" button at the top (or manually upload the file to Google Colab).
@@ -58,7 +58,7 @@ Run All: Click "Run all cells".
 
 Copy Link: Once the execution finishes, copy the API link generated at the bottom (e.g., https://xxxx.ngrok-free.app).
 
-####2. Connect the Frontend
+#### 2. Connect the Frontend
 Download index.html to your local machine.
 
 Open index.html with a text editor (like Notepad or VS Code).
